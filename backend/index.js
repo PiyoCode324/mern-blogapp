@@ -9,7 +9,7 @@ import dotenv from "dotenv";
 import bodyParser from "body-parser";
 
 // ----------------------------------------------------
-// 環境変数の読み込み (サーバーの起動前に必須)
+// 環境変数の読み込み
 // ----------------------------------------------------
 dotenv.config();
 console.log("---------------------------------------");
@@ -23,27 +23,32 @@ console.log("---------------------------------------");
 const app = express();
 
 // ----------------------------------------------------
-// ミドルウェアの配置 (重要!)
+// ミドルウェアの配置
 // ----------------------------------------------------
 
-// clerkMiddleware() を関数実行してミドルウェア関数を取得
-const clerkAuthMiddleware = clerkMiddleware();
+// Clerkミドルウェアをaudience指定で初期化
+const clerkAuthMiddleware = clerkMiddleware({
+  apiKey: process.env.CLERK_SECRET_KEY,
+  jwt: {
+    audience: "http://localhost:3000", // ClerkのJWTテンプレートで設定したaudienceに合わせてください
+  },
+});
 
-// 1. Webhooks/clerkルートはrawボディで受け取るため専用設定
-app.use("/webhooks/clerk", bodyParser.raw({ type: 'application/json' }));
+// 1. Clerk Webhook は raw ボディ必要
+app.use("/webhooks/clerk", bodyParser.raw({ type: "application/json" }));
 
-// 2. それ以外のwebhooksは通常のjsonパース
-app.use("/webhooks", express.json());
+// 2. 通常 Webhook は JSON
+// app.use("/webhooks", express.json()); // ★この行を削除またはコメントアウト！★
 
-// 3. Webhooksルートは認証スキップのため、先に配置
+// 3. Webhooksルートは認証スキップ
 app.use("/webhooks", webhookRouter);
 
-// 4. その他ルートはexpress.json()でJSONパース
+// 4. 通常ルート用 JSON パース
 app.use(express.json());
 
-// 5. Clerk認証ミドルウェア（webhooks以外のルートにのみ適用）
+// 5. Clerk 認証ミドルウェア（webhooks除く）
 app.use((req, res, next) => {
-    if (req.originalUrl.startsWith('/webhooks')) {
+    if (req.originalUrl.startsWith("/webhooks")) {
         console.log("[Middleware] Skipping clerkMiddleware for webhooks.");
         return next();
     }
@@ -53,17 +58,22 @@ app.use((req, res, next) => {
 
 // 6. カスタム認証チェック
 app.use((req, res, next) => {
-    if (req.originalUrl.startsWith('/webhooks')) {
+    if (req.originalUrl.startsWith("/webhooks")) {
         console.log("[Middleware] Skipping custom auth check for webhooks.");
         return next();
     }
+
     console.log("[Middleware] Entering custom auth check.");
-    console.log("[Middleware] req.auth state:", req.auth ? "present" : "absent");
-    if (!req.auth || !req.auth.userId) {
-        console.log("[Middleware] Authentication failed: req.auth missing or userId null.");
+
+    const auth = req.auth(); // ← 正解
+    console.log("[Middleware] req.auth() result:", auth);
+
+    if (!auth || !auth.userId) {
+        console.log("[Middleware] Authentication failed: req.auth() missing or userId null.");
         return res.status(401).json("Not authenticated!");
     }
-    console.log("[Middleware] Authenticated user ID:", req.auth.userId);
+
+    console.log("[Middleware] Authenticated user ID:", auth.userId);
     next();
 });
 
@@ -75,14 +85,11 @@ app.use("/comments", commentRouter);
 // ----------------------------------------------------
 // 汎用ログとエラーハンドリング
 // ----------------------------------------------------
-
-// catch-all ログ用ミドルウェア
 app.use((req, res, next) => {
-    console.log(`[Middleware] No route matched for ${req.originalUrl}. Falling through to error handling/default.`);
+    console.log(`[Middleware] No route matched for ${req.originalUrl}.`);
     next();
 });
 
-// エラーハンドリングミドルウェア
 app.use((error, req, res, next) => {
     console.error("---------------------------------------");
     console.error("[ERROR HANDLER] Caught an error!");
@@ -95,7 +102,7 @@ app.use((error, req, res, next) => {
     res.status(error.status || 500).json({
         message: error.message || "Something went wrong!",
         status: error.status,
-        stack: process.env.NODE_ENV === 'production' ? '🥞' : error.stack,
+        stack: process.env.NODE_ENV === "production" ? "🥞" : error.stack,
     });
 });
 
