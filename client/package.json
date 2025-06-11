@@ -10,8 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "19.0.0-rc-66855b96-20241106",
-    "react-dom": "19.0.0-rc-66855b96-20241106"
+    "@clerk/clerk-react": "^5.31.8",
+    "@tanstack/react-query": "^5.80.5",
+    "axios": "^1.9.0",
+    "imagekitio-react": "^4.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-quill-new": "^3.4.6",
+    "react-router-dom": "^7.6.2",
+    "react-toastify": "^11.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
