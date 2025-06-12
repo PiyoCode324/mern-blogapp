@@ -7,6 +7,7 @@ import webhookRouter from "./routes/webhook.route.js";
 import { clerkMiddleware } from "@clerk/express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
+import cors from "cors";
 
 // ----------------------------------------------------
 // 環境変数の読み込み
@@ -34,6 +35,8 @@ const clerkAuthMiddleware = clerkMiddleware({
   },
 });
 
+app.use(cors(process.env.CLIENT_URL));
+
 // 1. Clerk Webhook は raw ボディ必要
 app.use("/webhooks/clerk", bodyParser.raw({ type: "application/json" }));
 
@@ -53,6 +56,9 @@ app.use((req, res, next) => {
         return next();
     }
     console.log("[Middleware] Before clerkMiddleware");
+    // --- ★ここから追加★ ---
+    console.log("[Middleware] Auth Header before clerkMiddleware:", req.headers.authorization);
+    // --- ★ここまで追加★ ---
     clerkAuthMiddleware(req, res, next);
 });
 
@@ -67,6 +73,12 @@ app.use((req, res, next) => {
 
     const auth = req.auth(); // ← 正解
     console.log("[Middleware] req.auth() result:", auth);
+
+    // --- ★ここから追加★ ---
+    if (auth && typeof auth.userId === 'undefined') {
+        console.warn("[Middleware] WARNING: req.auth() result object is present, but userId is undefined.");
+    }
+    // --- ★ここまで追加★ ---
 
     if (!auth || !auth.userId) {
         console.log("[Middleware] Authentication failed: req.auth() missing or userId null.");

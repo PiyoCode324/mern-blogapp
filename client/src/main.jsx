@@ -13,7 +13,10 @@ import LoginPage from './routes/LoginPage.jsx';
 import RegisterPage from './routes/RegisterPage.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import { ClerkProvider } from "@clerk/clerk-react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { 
+  QueryClient, 
+  QueryClientProvider,
+} from "@tanstack/react-query";
 
 const queryClient = new QueryClient();
 
