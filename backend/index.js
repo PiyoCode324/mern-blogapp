@@ -36,6 +36,10 @@ const clerkAuthMiddleware = clerkMiddleware({
   },
 });
 
+app.get("/", (req, res) => {
+  res.send("Hello, this is the root!");
+});
+
 app.use(cors({ origin: process.env.CLIENT_URL }));
 
 // 1. Clerk Webhook は raw ボディ必要

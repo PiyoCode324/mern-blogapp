@@ -1,10 +1,40 @@
-import {Link} from "react-router-dom"
+import { Link, useParams } from "react-router-dom";
 import Image from "../components/Image"
 import PostMenuActions from "../components/PostMenuActions";
 import Search from "../components/Search";
 import Comments from "../components/Comments";
+import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react"; // ★追加するインポート★
+
+// fetchPost 関数を、getToken 関数を引数として受け取るように変更
+// ★ここに Authorization ヘッダーを追加するロジックがあるか？★
+const fetchPost = async (slug, getToken) => { // getToken を引数で受け取る
+  const token = await getToken(); // トークンを取得
+  const res = await axios.get(`${import.meta.env.VITE_API_URL}/posts/${slug}`, {
+    headers: {
+      Authorization: `Bearer ${token}`, // ★ここに Authorization ヘッダーを追加★
+    },
+  });
+  return res.data;
+};
 
 const SinglePostPage = () => {
+
+  const { slug } = useParams();
+  const { getToken } = useAuth(); // ★追加する行：useAuth から getToken を取得★
+
+  const { isPending, error, data } = useQuery({
+    queryKey: ["post", slug],
+    queryFn: () => fetchPost(slug, getToken), // ★変更する行：fetchPost に getToken を渡す★
+    enabled: !!slug, // slugがある場合のみクエリを実行するよう追加（より堅牢な実装のため）
+  });
+
+  if (isPending) return "loading...";
+  if (error) return "Something went wrong!" + error.message;
+  if (!data) return "Post not found!";
+
+
   return (
     <div className="flex flex-col gap-8">
       {/* detail */}
@@ -142,7 +172,7 @@ const SinglePostPage = () => {
               </Link>
             </div>
           </div>
-          <PostMenuActions/>
+          <PostMenuActions post={data}/>
           <h1 className="mt-8 mb-4 text-sm font-medium">Categories</h1>
           <div className="flex flex-col gap-2 text-sm">
             <Link className="underline">All</Link>

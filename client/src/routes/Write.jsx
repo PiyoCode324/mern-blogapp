@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 const Write = () => {
 
@@ -27,7 +28,12 @@ const Write = () => {
       });
     },
     onSuccess:(res)=>{
+      toast.success("Post has been created")
       navigate(`/${res.data.slug}`);
+    },
+    onError: (error) => { // エラーハンドリングも重要です
+        console.error("Post creation failed:", error);
+        toast.error(error.response?.data?.message || error.message || "Failed to create post.");
     }
   });
 
@@ -44,12 +50,17 @@ const Write = () => {
     const formData=new FormData(e.target)
 
     const data={
-    title:formData.get("title"),
+    title: formData.get("title"), // ここがポイント！
     category:formData.get("category"),
     desc:formData.get("desc"),
     content:value,
     };
-    console.log(data);
+    // ★ ここにログを追加してください
+    console.log("--- DEBUG: Data being sent to backend ---");
+    console.log("data.title:", data.title);
+    console.log("Full data object:", data);
+    console.log("---------------------------------------");
+
     mutation.mutate(data);
   };
 

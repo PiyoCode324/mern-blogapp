@@ -3,6 +3,11 @@ import PostListItem from './PostListItem';
 import axios from "axios";
 import { useAuth } from '@clerk/clerk-react'; // ⭐ 1. Clerkの useAuth フックをインポート
 
+const fetchPosts=async ()=>{
+  const res=await axios.get(`${import.meta.env.VITE_API_URL}/posts`);
+  return res.data;
+}
+
 const PostList = () => {
   // ⭐ 2. useAuth フックをコンポーネント内で呼び出す
   const { getToken, isLoaded, isSignedIn } = useAuth();
