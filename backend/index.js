@@ -27,33 +27,57 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ----------------------------------------------------
-// ミドルウェアの配置
+// CORS設定（ローカルと本番を許可）
 // ----------------------------------------------------
+const allowedOrigins = [
+  "http://localhost:5173", // ✅ Viteのデフォルトポート
+  "https://mern-blogapp-client.onrender.com",
+];
 
-// Clerkミドルウェアをaudience指定で初期化
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
+// ----------------------------------------------------
+// Clerkミドルウェア初期化
+// ----------------------------------------------------
 const clerkAuthMiddleware = clerkMiddleware({
   apiKey: process.env.CLERK_SECRET_KEY,
   jwt: {
-    audience: process.env.CLIENT_URL || "http://localhost:5173", // ← ここも環境変数を使うと柔軟です
+    audience: process.env.CLIENT_URL || "http://localhost:3000",
   },
 });
 
+// ----------------------------------------------------
+// ヘルスチェックルート
+// ----------------------------------------------------
 app.get("/", (req, res) => {
   res.send("Hello, this is the root!");
 });
 
-app.use(cors({ origin: process.env.CLIENT_URL }));
-
-// 1. Clerk Webhook は raw ボディ必要
+// ----------------------------------------------------
+// Webhook（raw body必須）
+// ----------------------------------------------------
 app.use("/webhooks/clerk", bodyParser.raw({ type: "application/json" }));
 
-// 2. Webhooksルートは認証スキップ
+// Webhookは認証スキップ
 app.use("/webhooks", webhookRouter);
 
-// 3. 通常ルート用 JSON パース
+// 通常ルート用 JSON パーサー
 app.use(express.json());
 
-// 4. Clerk 認証ミドルウェア（webhooks除く）
+// ----------------------------------------------------
+// Clerk認証ミドルウェア（webhooksを除く）
+// ----------------------------------------------------
 app.use((req, res, next) => {
   if (req.originalUrl.startsWith("/webhooks")) {
     console.log("[Middleware] Skipping clerkMiddleware for webhooks.");
@@ -67,7 +91,9 @@ app.use((req, res, next) => {
   clerkAuthMiddleware(req, res, next);
 });
 
-// 5. カスタム認証チェック
+// ----------------------------------------------------
+// カスタム認証チェック（webhooksを除く）
+// ----------------------------------------------------
 app.use((req, res, next) => {
   if (req.originalUrl.startsWith("/webhooks")) {
     console.log("[Middleware] Skipping custom auth check for webhooks.");
@@ -75,15 +101,8 @@ app.use((req, res, next) => {
   }
 
   console.log("[Middleware] Entering custom auth check.");
-
   const auth = req.auth();
   console.log("[Middleware] req.auth() result:", auth);
-
-  if (auth && typeof auth.userId === "undefined") {
-    console.warn(
-      "[Middleware] WARNING: req.auth() result object is present, but userId is undefined."
-    );
-  }
 
   if (!auth || !auth.userId) {
     console.log(
@@ -96,9 +115,11 @@ app.use((req, res, next) => {
   next();
 });
 
-//imagekit
-app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
+// ----------------------------------------------------
+// ImageKit用 CORSヘッダー（すでにCORS対応してるのでここは不要でもOK）
+// ----------------------------------------------------
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept"
@@ -106,13 +127,15 @@ app.use(function (req, res, next) {
   next();
 });
 
-// 6. 各ルートの設定
+// ----------------------------------------------------
+// ルート設定
+// ----------------------------------------------------
 app.use("/users", userRouter);
 app.use("/posts", postRouter);
 app.use("/comments", commentRouter);
 
 // ----------------------------------------------------
-// 汎用ログとエラーハンドリング
+// 未マッチルートとエラー処理
 // ----------------------------------------------------
 app.use((req, res, next) => {
   console.log(`[Middleware] No route matched for ${req.originalUrl}.`);
@@ -136,7 +159,7 @@ app.use((error, req, res, next) => {
 });
 
 // ----------------------------------------------------
-// サーバー起動（0.0.0.0を指定してRender対応）
+// サーバー起動（Render対応の 0.0.0.0）
 // ----------------------------------------------------
 app.listen(port, "0.0.0.0", async () => {
   console.log(`Attempting to connect to DB...`);
