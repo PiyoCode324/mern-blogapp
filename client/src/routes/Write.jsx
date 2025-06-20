@@ -1,31 +1,41 @@
+// Write.jsx
+
 import { useAuth, useUser } from "@clerk/clerk-react";
 import "react-quill-new/dist/quill.snow.css";
 import ReactQuill from "react-quill-new";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-// IKContext, IKUpload は Upload.jsx に移動したので、ここからは削除
-// import { IKContext, IKUpload } from "imagekitio-react";
-
-import Upload from "../components/Upload"; // ⭐ 分離した Upload コンポーネントをインポート
+import Upload from "../components/Upload";
 
 const Write = () => {
   const { isLoaded, isSignedIn } = useUser();
   const [value, setValue] = useState("");
-  const [cover, setCover] = useState(""); // カバー画像用
+  const [cover, setCover] = useState(""); // カバー画像用: ここにImageKitの完全なURLが文字列として保存される
   const [img, setImg] = useState(""); // 本文中の画像用（例として追加）
   const [video, setVideo] = useState(""); // 動画用（例として追加）
 
   // 現在の進捗度を管理するstate。Uploadコンポーネントから更新される。
   const [progress, setProgress] = useState(0);
 
+  useEffect(() => {
+    // Note: img state now holds the full URL string, not an object with a 'url' property
+    img && setValue((prev) => prev + `<p><image src="${img}"/></p>`);
+  }, [img]);
+
+  useEffect(() => {
+    // Note: video state now holds the full URL string, not an object with a 'url' property
+    video &&
+      setValue(
+        (prev) =>
+          prev + `<p><iframe class="ql-video" src="${video}"></iframe></p>`
+      );
+  }, [video]);
+
   const navigate = useNavigate();
   const { getToken } = useAuth();
-
-  // ⭐ ここにあった空のauthenticator関数ブロックは削除します
-  // };
 
   const mutation = useMutation({
     mutationFn: async (newPost) => {
@@ -62,22 +72,48 @@ const Write = () => {
   }
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // フォームのデフォルト送信を防止
+
+    // --- ここからクライアントサイドのバリデーションを追加 ---
     const formData = new FormData(e.target);
+    const title = formData.get("title");
+    const desc = formData.get("desc");
+    const category = formData.get("category");
+    const content = value;
+
+    // ⭐ 修正箇所: cover.filePath ではなく、cover そのものを使う
+    // cover ステートには既に Upload.jsx から渡された完全なURL文字列が入っている
+    const imageUrl = cover || "";
+
+    // タイトルが入力されているかチェック
+    if (!title || title.trim() === "") {
+      toast.error("タイトルは必須です。");
+      return; // ここで処理を中断
+    }
+    // 説明文が入力されているかチェック
+    if (!desc || desc.trim() === "") {
+      toast.error("説明文は必須です。");
+      return; // ここで処理を中断
+    }
+    // もしカバー画像も必須としたいなら、以下のコメントを外してください
+    // if (!imageUrl) {
+    //   toast.error("カバー画像をアップロードしてください。");
+    //   return; // ここで処理を中断
+    // }
+    // --------------------------------------------------------
 
     const data = {
-      title: formData.get("title"),
-      category: formData.get("category"),
-      desc: formData.get("desc"),
-      content: value,
-      // ⭐ アップロードされた画像のURLを投稿データに含めます
-      // coverが主要な画像、imgやvideoはテキストエディタ内で使われるかもしれない画像のURLを想定
-      img: cover || img || video, // どの画像を使うかはアプリケーションのロジックに合わせる
+      img: imageUrl, // これで正しい完全なURLがバックエンドに送信される
+      title: title,
+      category: category,
+      desc: desc,
+      content: content,
     };
 
-    console.log("--- DEBUG: Data being sent to backend ---");
+    // ⭐ デバッグログ: バックエンドに送信されるデータを確認
+    console.log("--- DEBUG: Data being sent to backend (from Write.jsx) ---");
     console.log("data.title:", data.title);
-    console.log("data.img (uploaded file URL):", data.img); // 追加
+    console.log("data.img (uploaded file URL):", data.img);
     console.log("Full data object:", data);
     console.log("---------------------------------------");
 
@@ -89,7 +125,11 @@ const Write = () => {
       <h1 className="text-cl font-light">Create a New Post</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 flex-1 mb-6">
         <Upload type="image" setProgress={setProgress} setData={setCover}>
-          <button className="w-max p-2 shadow-md rounded-xl text-sm text-gray-500 bg-white">
+          {/* ⭐ type="button" を追加してフォーム送信を防ぐ */}
+          <button
+            type="button"
+            className="w-max p-2 shadow-md rounded-xl text-sm text-gray-500 bg-white"
+          >
             Add a cover image
           </button>
         </Upload>
@@ -124,10 +164,12 @@ const Write = () => {
         <div className="flex flex-1 ">
           <div className="flex flex-col gap-2 mr-2">
             <Upload type="image" setProgress={setProgress} setData={setImg}>
-              🌆
+              {/* ⭐ こちらのボタンにも type="button" を追加 */}
+              <button type="button">🌆</button>
             </Upload>
             <Upload type="video" setProgress={setProgress} setData={setVideo}>
-              ▶️
+              {/* ⭐ こちらのボタンにも type="button" を追加 */}
+              <button type="button">▶️</button>
             </Upload>
           </div>
           <ReactQuill
@@ -145,7 +187,6 @@ const Write = () => {
           {mutation.isPending ? "Loading..." : "Send"}
         </button>
         {"Progress:" + progress}
-        {/* {mutation.isError && <span>{mutation.error.message}</span>} */}
       </form>
     </div>
   );

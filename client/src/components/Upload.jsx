@@ -1,11 +1,13 @@
+// Upload.jsx
+
 import { IKContext, IKUpload } from "imagekitio-react";
 import { toast } from "react-toastify";
 import { useAuth } from "@clerk/clerk-react";
 import { useRef } from "react";
 
-const Upload = ({ setProgress, setData, children }) => {
+const Upload = ({ children, type, setProgress, setData }) => {
   const { getToken } = useAuth();
-  const uploadRef = useRef(); // 👈 ref でIKUploadを制御
+  const uploadRef = useRef();
 
   const authenticator = async () => {
     try {
@@ -42,13 +44,21 @@ const Upload = ({ setProgress, setData, children }) => {
   };
 
   const onError = (err) => {
-    console.log(err);
-    toast.error("Image upload failed!");
+    console.log("ImageKit Upload Error:", err); // より詳細なログ
+    toast.error("画像のアップロードに失敗しました！");
   };
 
   const onSuccess = (res) => {
-    console.log(res);
-    setData(res.url); // 画像URLだけ渡す
+    console.log(
+      "--- DEBUG: ImageKit Upload Success Response (from Upload.jsx) ---"
+    );
+    console.log("Full ImageKit Response:", res); // 成功時のレスポンス全体を確認
+    console.log("Image URL (res.url):", res.url); // res.url を確認
+    console.log("---------------------------------------");
+
+    // ⭐ setData に res.url (完全な画像URL) を渡す
+    setData(res.url);
+    toast.success("画像を正常にアップロードしました！");
   };
 
   const onUploadProgress = (progress) => {
@@ -61,7 +71,6 @@ const Upload = ({ setProgress, setData, children }) => {
       urlEndpoint={import.meta.env.VITE_IK_URL_ENDPOINT}
       authenticator={authenticator}
     >
-      {/* 👇 ラッパー要素をクリックしたらIKUploadをトリガー */}
       <div
         onClick={() => uploadRef.current.click()}
         className="cursor-pointer hover:opacity-80"
@@ -69,15 +78,15 @@ const Upload = ({ setProgress, setData, children }) => {
         {children}
       </div>
 
-      {/* 👇 非表示にしてref経由でクリック可能に */}
       <IKUpload
-        ref={uploadRef}
         useUniqueFileName
         folder="/blogapp"
         onError={onError}
         onSuccess={onSuccess}
         onUploadProgress={onUploadProgress}
         style={{ display: "none" }}
+        ref={uploadRef}
+        accept={`${type}/*`}
       />
     </IKContext>
   );

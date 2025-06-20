@@ -1,16 +1,27 @@
+// controllers/post.controller.js
+
 import ImageKit from "imagekit";
 import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
 
 export const getPosts = async (req, res) => {
-  const posts = await Post.find();
-  res.status(200).json(posts);
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 2;
+
+  const posts = await Post.find()
+    .limit(limit)
+    .skip((page - 1) * limit);
+
+  const totalPosts = await Post.countDocuments();
+  const hasMore = page * limit < totalPosts;
+
+  res.status(200).json({ posts, hasMore });
 };
 
 export const getPost = async (req, res) => {
   const post = await Post.findOne({ slug: req.params.slug }).populate(
     "user",
-    "username img" // username と img フィールドのみをpopulate
+    "username img"
   );
   res.status(200).json(post);
 };
@@ -18,7 +29,13 @@ export const getPost = async (req, res) => {
 export const createPost = async (req, res) => {
   const clerkUserId = req.auth.userId;
 
-  console.log(req.headers);
+  // ⭐⭐⭐ デバッグログ: バックエンドで受け取ったリクエストボディを確認 ⭐⭐⭐
+  console.log("---------------------------------------");
+  console.log("[Backend: createPost] API called.");
+  console.log("[Backend: createPost] Request Body (full):", req.body);
+  console.log("[Backend: createPost] req.body.img value:", req.body.img);
+  console.log("---------------------------------------");
+  // ⭐⭐⭐ デバッグログここまで ⭐⭐⭐
 
   if (!clerkUserId) {
     return res.status(401).json("Not authenticated!");
@@ -42,10 +59,25 @@ export const createPost = async (req, res) => {
     counter++;
   }
 
-  const newPost = new Post({ user: user._id, slug, ...req.body });
+  // ⭐⭐⭐ 修正箇所: req.body から img を明示的に抽出し、新しいオブジェクトを構築 ⭐⭐⭐
+  // フロントエンドから 'img' というキーで完全なURLが送信されていることを期待します。
+  const { title, desc, img, category, content, isFeatured } = req.body;
+
+  const newPost = new Post({
+    user: user._id,
+    slug,
+    title,
+    desc,
+    img, // ⭐ ここで完全なURLがDBに保存される
+    category,
+    content,
+    isFeatured,
+  });
+  // ⭐⭐⭐ 修正箇所ここまで ⭐⭐⭐
 
   const post = await newPost.save();
-  res.status(200).json(post);
+  console.log("[Backend: createPost] Post created successfully:", post);
+  res.status(201).json(post); // ステータスコードを201 (Created) に変更することも検討
 };
 
 export const deletePost = async (req, res) => {
@@ -69,19 +101,13 @@ export const deletePost = async (req, res) => {
   res.status(200).json("Post has been deleted");
 };
 
-// ⭐ 修正箇所: imagekit の初期化を uploadAuth 関数の中に移動します。
-// これにより、uploadAuth が呼び出される時には dotenv.config() で
-// 環境変数が確実にロードされていることが保証されます。
-
 export const uploadAuth = async (req, res) => {
-  // ImageKitインスタンスを関数内で初期化
   const imagekit = new ImageKit({
     urlEndpoint: process.env.IK_URL_ENDPOINT,
     publicKey: process.env.IK_PUBLIC_KEY,
     privateKey: process.env.IK_PRIVATE_KEY,
   });
 
-  // ⭐ 環境変数が正しくロードされているかデバッグログを追加
   console.log(
     "ImageKit publicKey:",
     process.env.IK_PUBLIC_KEY ? "Loaded" : "MISSING!"
@@ -95,7 +121,6 @@ export const uploadAuth = async (req, res) => {
     process.env.IK_URL_ENDPOINT ? "Loaded" : "MISSING!"
   );
 
-  // publicKeyが本当にない場合はエラーを返す
   if (
     !process.env.IK_PUBLIC_KEY ||
     !process.env.IK_PRIVATE_KEY ||
