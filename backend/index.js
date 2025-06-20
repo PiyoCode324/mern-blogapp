@@ -76,11 +76,17 @@ app.use("/webhooks", webhookRouter);
 app.use(express.json());
 
 // ----------------------------------------------------
-// Clerk認証ミドルウェア（webhooksを除く）
+// Clerk認証ミドルウェア（webhooksとImageKit認証エンドポイントを除く）
 // ----------------------------------------------------
 app.use((req, res, next) => {
-  if (req.originalUrl.startsWith("/webhooks")) {
-    console.log("[Middleware] Skipping clerkMiddleware for webhooks.");
+  // webhooksと/posts/upload-authを認証スキップ対象に追加
+  if (
+    req.originalUrl.startsWith("/webhooks") ||
+    req.originalUrl.startsWith("/posts/upload-auth") // ここを追加しました
+  ) {
+    console.log(
+      "[Middleware] Skipping clerkMiddleware for webhooks or ImageKit auth."
+    );
     return next();
   }
   console.log("[Middleware] Before clerkMiddleware");
@@ -92,11 +98,17 @@ app.use((req, res, next) => {
 });
 
 // ----------------------------------------------------
-// カスタム認証チェック（webhooksを除く）
+// カスタム認証チェック（webhooksとImageKit認証エンドポイントを除く）
 // ----------------------------------------------------
 app.use((req, res, next) => {
-  if (req.originalUrl.startsWith("/webhooks")) {
-    console.log("[Middleware] Skipping custom auth check for webhooks.");
+  // webhooksと/posts/upload-authをカスタム認証スキップ対象に追加
+  if (
+    req.originalUrl.startsWith("/webhooks") ||
+    req.originalUrl.startsWith("/posts/upload-auth") // ここを追加しました
+  ) {
+    console.log(
+      "[Middleware] Skipping custom auth check for webhooks or ImageKit auth."
+    );
     return next();
   }
 
