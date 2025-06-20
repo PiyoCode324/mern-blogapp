@@ -43,7 +43,7 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true,
+    credentials: true, // クレデンシャル（Cookieなど）を許可する場合
   })
 );
 
@@ -116,18 +116,6 @@ app.use((req, res, next) => {
 });
 
 // ----------------------------------------------------
-// ImageKit用 CORSヘッダー（すでにCORS対応してるのでここは不要でもOK）
-// ----------------------------------------------------
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-  next();
-});
-
-// ----------------------------------------------------
 // ルート設定
 // ----------------------------------------------------
 app.use("/users", userRouter);
@@ -139,7 +127,10 @@ app.use("/comments", commentRouter);
 // ----------------------------------------------------
 app.use((req, res, next) => {
   console.log(`[Middleware] No route matched for ${req.originalUrl}.`);
-  next();
+  // 404エラーを生成して次のミドルウェアに渡す
+  const error = new Error(`Not Found: ${req.originalUrl}`);
+  error.status = 404;
+  next(error);
 });
 
 app.use((error, req, res, next) => {
